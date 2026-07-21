@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">WaveSnap</string>
+    <string name="gesture_status_initializing">Initializing</string>
+    <string name="gesture_status_manual_preview">Manual preview ready</string>
+    <string name="gesture_status_camera_unavailable">Camera unavailable</string>
+    <string name="gesture_status_analysis_starting">Starting gesture preview</string>
+    <string name="gesture_status_armed">Armed — wave your hand</string>
+    <string name="gesture_status_detected_countdown">Gesture detected</string>
+    <string name="gesture_status_capturing">Capturing</string>
+    <string name="gesture_status_cooldown">Cooldown — hold still</string>
+    <string name="gesture_countdown_3">3</string>
+    <string name="gesture_countdown_2">2</string>
+    <string name="gesture_countdown_1">1</string>
+    <string name="gesture_status_preview_unavailable">Gesture preview unavailable</string>
+</resources>

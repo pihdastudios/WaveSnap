@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sony PMCA Workflow"
+  short_description: "Build, verify, install, and inspect PMCA apps"
+  default_prompt: "Use $sony-pmca-workflow to build, verify, install, and collect device logs for WaveSnap."

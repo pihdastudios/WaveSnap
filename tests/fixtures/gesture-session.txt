@@ -1,0 +1,14 @@
+[INFO] GestureCamera: onResume begin
+[INFO] GestureCamera: nativeFrame=1 meanLuma=90 result=0 motionPermille=0 globalPermille=0 centroid=-1,-1 areaPermille=0 flags=0 cameraShift=0,0 processMs=20 averageProcessMs=20 jpegBytes=40000
+[INFO] GestureFrames: analyticalFps=9.8 averagePayloadBytes=45000 intervalFrames=49
+[INFO] GestureCamera: nativeFrame=50 meanLuma=91 result=0 motionPermille=40 globalPermille=30 centroid=-1,-1 areaPermille=0 flags=32 cameraShift=3,0 processMs=22 averageProcessMs=21 jpegBytes=50000
+[INFO] GestureCamera: nativeFrame=51 meanLuma=91 result=2 motionPermille=80 globalPermille=55 centroid=-1,-1 areaPermille=40 flags=64 cameraShift=0,0 localFlow=-12 blocks=6 processMs=23 averageProcessMs=21 jpegBytes=51000
+[INFO] GestureCamera: countdown accepted-wave timestampMs=1000 token=1
+[INFO] GestureCamera: countdown start timestampMs=1001 token=1
+[INFO] GestureCamera: autofocus requested source=automatic countdown timestampMs=3010
+[INFO] GestureCamera: capture requested source=automatic timestampMs=4020
+[INFO] GestureCamera: cooldown start source=automatic captureRequested=true deadlineMs=7020
+[INFO] GestureCamera: automatic shutter released timestampMs=4430
+[INFO] GestureCamera: cooldown end and rearm timestampMs=8100
+[INFO] GestureCamera: onPause begin
+[INFO] GestureCamera: onPause complete

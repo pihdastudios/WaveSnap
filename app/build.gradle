@@ -1,0 +1,47 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 10
+    buildToolsVersion "25.0.2"
+
+    defaultConfig {
+        applicationId "io.pihda.wavesnap"
+        minSdkVersion 10
+        targetSdkVersion 10
+        versionCode 1
+        versionName "1.0.0"
+
+        ndk {
+            abiFilters "armeabi"
+        }
+
+        externalNativeBuild {
+            ndkBuild {
+                arguments "NDK_APPLICATION_MK:=src/main/jni/Application.mk"
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_6
+        targetCompatibility JavaVersion.VERSION_1_6
+    }
+
+    externalNativeBuild {
+        ndkBuild {
+            path "src/main/jni/Android.mk"
+        }
+    }
+}
+
+android.applicationVariants.all { variant ->
+    variant.outputs.each { output ->
+        def apkName = "WaveSnap-${output.baseName}-${variant.versionName}.apk"
+        output.outputFile = new File(output.outputFile.parent, apkName)
+    }
+}
+
+dependencies {
+    compile 'com.github.ma1co.OpenMemories-Framework:framework:-SNAPSHOT'
+    provided 'com.github.ma1co.OpenMemories-Framework:stubs:-SNAPSHOT'
+}
