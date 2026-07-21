@@ -22,7 +22,7 @@ WaveSnap is a single-purpose legacy Sony PlayMemories Camera App. Treat the conn
 
 ## Local workflow
 
-Toolchains and caches live under `../toolchain/`; JDK 8 is `/home/klm/.package-manager/jdk`. Use the project-local `sony-pmca-workflow` skill and scripts instead of reconstructing commands:
+Toolchains and caches live under `../toolchain/`; JDK 8 is `/home/klm/.package-manager/jdk`. Use the workspace-root `sony-camera-app-workflow` skill at `../.codex/skills/sony-camera-app-workflow/SKILL.md` and project scripts instead of reconstructing commands:
 
 - `./scripts/smoke-test.sh [--host-only] [--clean]`
 - `./scripts/build.sh [--clean]`
