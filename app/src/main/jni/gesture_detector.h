@@ -4,11 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum GestureResult {
-    GESTURE_RESULT_NONE = 0,
-    GESTURE_RESULT_MOTION = 1,
-    GESTURE_RESULT_WAVE = 2
-};
+enum GestureResult { GESTURE_RESULT_NONE = 0, GESTURE_RESULT_MOTION = 1, GESTURE_RESULT_WAVE = 2 };
 
 enum GestureError {
     GESTURE_ERROR_NOT_INITIALIZED = -1,

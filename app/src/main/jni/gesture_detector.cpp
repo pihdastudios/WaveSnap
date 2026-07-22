@@ -1,7 +1,7 @@
 #include "gesture_detector.h"
 
-#include <jni.h>
 #include <android/log.h>
+#include <jni.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -82,21 +82,10 @@ struct DetectorConfig {
     int refractoryDurationMs;
 };
 
-const DetectorConfig kConfig = {
-    10, 90, 5, 65,
-    10, 2, 40,
-    350, 450, 20,
-    6, 0, 2, 6, 180,
-    4, 4, 16, 2,
-    4, 8, 30, 300,
-    2, 64, 550, 2,
-    16, 12, 2, 300, 80, 1500,
-    6, 300, 850, 800,
-    8, 20,
-    6, 24, 8, 20,
-    42, 45,
-    4, 350, 250, 2200, 1800
-};
+const DetectorConfig kConfig = {10, 90,  5,  65, 10,  2,  40,   350, 450, 20,   6,   0,  2,
+                                6,  180, 4,  4,  16,  2,  4,    8,   30,  300,  2,   64, 550,
+                                2,  16,  12, 2,  300, 80, 1500, 6,   300, 850,  800, 8,  20,
+                                6,  24,  8,  20, 42,  45, 4,    350, 250, 2200, 1800};
 
 enum WaveTrackingState {
     WAVE_IDLE = 0,
@@ -181,30 +170,18 @@ struct JpegInput {
     size_t offset;
 };
 
-DetectorState gState = {
-    0, 0, 0, 0, 0,
-    NULL, 0, NULL, NULL, NULL, NULL,
-    0, 0, false, false
-};
-WaveTracker gWave = {
-    WAVE_IDLE, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0,
-    0, 0, 0
-};
-FlowTracker gFlow = {
-    FLOW_IDLE, 0, 0, 0, 0, 0, 0
-};
+DetectorState gState = {0, 0, 0, 0, 0, NULL, 0, NULL, NULL, NULL, NULL, 0, 0, false, false};
+WaveTracker gWave = {WAVE_IDLE, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+FlowTracker gFlow = {FLOW_IDLE, 0, 0, 0, 0, 0, 0};
 pthread_mutex_t gDetectorMutex = PTHREAD_MUTEX_INITIALIZER;
 
 unsigned char readJpegBytes(unsigned char* destination, unsigned char requested,
-        unsigned char* actual, void* callbackData) {
+                            unsigned char* actual, void* callbackData) {
     if (destination == NULL || actual == NULL || callbackData == NULL) {
         return PJPG_STREAM_READ_ERROR;
     }
     JpegInput* input = static_cast<JpegInput*>(callbackData);
-    size_t remaining = input->offset < input->length
-            ? input->length - input->offset : 0;
+    size_t remaining = input->offset < input->length ? input->length - input->offset : 0;
     size_t count = remaining < requested ? remaining : requested;
     if (count > 0) {
         memcpy(destination, input->data + input->offset, count);
@@ -297,43 +274,35 @@ bool trajectoryWasMeaningful() {
     return gWave.firstTravel >= 12 || gWave.candidateFrames >= 3;
 }
 
-int updateWaveTrajectory(int x, int y, int areaPermille, int motionPermille,
-        int64_t timestampMs, int roiWidth, int roiHeight, int* flags) {
-    bool validCandidate = x >= 0 && y >= 0
-            && areaPermille >= kConfig.minimumTrackedAreaPermille
-            && motionPermille >= kConfig.minimumTrackedMotionPermille;
+int updateWaveTrajectory(int x, int y, int areaPermille, int motionPermille, int64_t timestampMs,
+                         int roiWidth, int roiHeight, int* flags) {
+    bool validCandidate = x >= 0 && y >= 0 && areaPermille >= kConfig.minimumTrackedAreaPermille &&
+                          motionPermille >= kConfig.minimumTrackedMotionPermille;
 
-    if ((*flags & (GESTURE_FLAG_GLOBAL_MOTION
-            | GESTURE_FLAG_EXPOSURE_CHANGE
-            | GESTURE_FLAG_COMPONENT_TOO_LARGE
-            | GESTURE_FLAG_CAMERA_TRANSLATION)) != 0) {
+    if ((*flags & (GESTURE_FLAG_GLOBAL_MOTION | GESTURE_FLAG_EXPOSURE_CHANGE |
+                   GESTURE_FLAG_COMPONENT_TOO_LARGE | GESTURE_FLAG_CAMERA_TRANSLATION)) != 0) {
         if (trajectoryWasMeaningful()) {
             *flags |= GESTURE_FLAG_TRAJECTORY_REJECTED;
             LOGI("wave rejected reason=disruptive_motion state=%d first=%d reverse=%d frames=%d",
-                    gWave.state, gWave.firstTravel, gWave.reverseTravel,
-                    gWave.candidateFrames);
+                 gWave.state, gWave.firstTravel, gWave.reverseTravel, gWave.candidateFrames);
         }
         clearWaveTrajectory();
         return GESTURE_RESULT_NONE;
     }
 
-    if (gWave.lastConfirmedTimestampMs > 0
-            && timestampMs >= gWave.lastConfirmedTimestampMs
-            && timestampMs - gWave.lastConfirmedTimestampMs
-                    < kConfig.refractoryDurationMs) {
+    if (gWave.lastConfirmedTimestampMs > 0 && timestampMs >= gWave.lastConfirmedTimestampMs &&
+        timestampMs - gWave.lastConfirmedTimestampMs < kConfig.refractoryDurationMs) {
         clearWaveTrajectory();
         return validCandidate ? GESTURE_RESULT_MOTION : GESTURE_RESULT_NONE;
     }
 
     if (!validCandidate) {
-        if (gWave.state != WAVE_IDLE
-                && timestampMs - gWave.lastCandidateTimestampMs
-                        > kConfig.maximumCandidateGapMs) {
+        if (gWave.state != WAVE_IDLE &&
+            timestampMs - gWave.lastCandidateTimestampMs > kConfig.maximumCandidateGapMs) {
             if (trajectoryWasMeaningful()) {
                 *flags |= GESTURE_FLAG_TRAJECTORY_REJECTED;
                 LOGI("wave rejected reason=motion_gap state=%d first=%d reverse=%d frames=%d",
-                        gWave.state, gWave.firstTravel, gWave.reverseTravel,
-                        gWave.candidateFrames);
+                     gWave.state, gWave.firstTravel, gWave.reverseTravel, gWave.candidateFrames);
             }
             clearWaveTrajectory();
         }
@@ -350,35 +319,35 @@ int updateWaveTrajectory(int x, int y, int areaPermille, int motionPermille,
         if (trajectoryWasMeaningful()) {
             *flags |= GESTURE_FLAG_TRAJECTORY_REJECTED;
             LOGI("wave rejected reason=timeout durationMs=%lld first=%d reverse=%d frames=%d",
-                    static_cast<long long>(durationMs), gWave.firstTravel,
-                    gWave.reverseTravel, gWave.candidateFrames);
+                 static_cast<long long>(durationMs), gWave.firstTravel, gWave.reverseTravel,
+                 gWave.candidateFrames);
         }
         beginWaveTrajectory(x, y, timestampMs);
         return GESTURE_RESULT_MOTION;
     }
 
-    int maximumHorizontalStep = percentageOf(roiWidth,
-            kConfig.maximumHorizontalStepPercent);
-    int maximumVerticalDrift = percentageOf(roiHeight,
-            kConfig.maximumVerticalDriftPercent);
+    int maximumHorizontalStep = percentageOf(roiWidth, kConfig.maximumHorizontalStepPercent);
+    int maximumVerticalDrift = percentageOf(roiHeight, kConfig.maximumVerticalDriftPercent);
     if (absoluteDifference(x, gWave.lastX) > maximumHorizontalStep) {
         if (trajectoryWasMeaningful()) {
             *flags |= GESTURE_FLAG_TRAJECTORY_REJECTED;
             LOGI("wave rejected reason=centroid_jump step=%d first=%d reverse=%d frames=%d",
-                    absoluteDifference(x, gWave.lastX), gWave.firstTravel,
-                    gWave.reverseTravel, gWave.candidateFrames);
+                 absoluteDifference(x, gWave.lastX), gWave.firstTravel, gWave.reverseTravel,
+                 gWave.candidateFrames);
         }
         beginWaveTrajectory(x, y, timestampMs);
         return GESTURE_RESULT_MOTION;
     }
 
-    if (y < gWave.minimumY) gWave.minimumY = y;
-    if (y > gWave.maximumY) gWave.maximumY = y;
+    if (y < gWave.minimumY)
+        gWave.minimumY = y;
+    if (y > gWave.maximumY)
+        gWave.maximumY = y;
     if (gWave.maximumY - gWave.minimumY > maximumVerticalDrift) {
         *flags |= GESTURE_FLAG_TRAJECTORY_REJECTED;
         LOGI("wave rejected reason=vertical_drift drift=%d first=%d reverse=%d frames=%d",
-                gWave.maximumY - gWave.minimumY, gWave.firstTravel,
-                gWave.reverseTravel, gWave.candidateFrames);
+             gWave.maximumY - gWave.minimumY, gWave.firstTravel, gWave.reverseTravel,
+             gWave.candidateFrames);
         clearWaveTrajectory();
         return GESTURE_RESULT_NONE;
     }
@@ -389,12 +358,9 @@ int updateWaveTrajectory(int x, int y, int areaPermille, int motionPermille,
     ++gWave.candidateFrames;
 
     int directionStart = percentageOf(roiWidth, kConfig.directionStartPercent);
-    int minimumFirstTravel = percentageOf(roiWidth,
-            kConfig.minimumFirstTravelPercent);
-    int reversalHysteresis = percentageOf(roiWidth,
-            kConfig.reversalHysteresisPercent);
-    int minimumReverseTravel = percentageOf(roiWidth,
-            kConfig.minimumReverseTravelPercent);
+    int minimumFirstTravel = percentageOf(roiWidth, kConfig.minimumFirstTravelPercent);
+    int reversalHysteresis = percentageOf(roiWidth, kConfig.reversalHysteresisPercent);
+    int minimumReverseTravel = percentageOf(roiWidth, kConfig.minimumReverseTravelPercent);
 
     if (gWave.firstDirection == 0) {
         int displacement = x - gWave.startX;
@@ -406,44 +372,39 @@ int updateWaveTrajectory(int x, int y, int areaPermille, int motionPermille,
         return GESTURE_RESULT_MOTION;
     }
 
-    bool extendsFirstDirection = (gWave.firstDirection > 0 && x > gWave.firstExtremeX)
-            || (gWave.firstDirection < 0 && x < gWave.firstExtremeX);
+    bool extendsFirstDirection = (gWave.firstDirection > 0 && x > gWave.firstExtremeX) ||
+                                 (gWave.firstDirection < 0 && x < gWave.firstExtremeX);
     if (gWave.state != WAVE_TRACKING_REVERSE && extendsFirstDirection) {
         gWave.firstExtremeX = x;
         gWave.firstTravel = absoluteDifference(gWave.firstExtremeX, gWave.startX);
     }
 
-    if (gWave.state == WAVE_TRACKING_FIRST_DIRECTION
-            && gWave.firstTravel >= minimumFirstTravel) {
+    if (gWave.state == WAVE_TRACKING_FIRST_DIRECTION && gWave.firstTravel >= minimumFirstTravel) {
         gWave.state = WAVE_FIRST_EXTREME_REACHED;
     }
 
-    int movementBack = gWave.firstDirection > 0
-            ? gWave.firstExtremeX - x : x - gWave.firstExtremeX;
-    if (gWave.state == WAVE_FIRST_EXTREME_REACHED
-            && movementBack >= reversalHysteresis) {
+    int movementBack = gWave.firstDirection > 0 ? gWave.firstExtremeX - x : x - gWave.firstExtremeX;
+    if (gWave.state == WAVE_FIRST_EXTREME_REACHED && movementBack >= reversalHysteresis) {
         gWave.state = WAVE_TRACKING_REVERSE;
         gWave.reverseExtremeX = x;
         gWave.reverseTravel = movementBack;
     } else if (gWave.state == WAVE_TRACKING_REVERSE) {
-        bool extendsReverseDirection = (gWave.firstDirection > 0
-                && x < gWave.reverseExtremeX)
-                || (gWave.firstDirection < 0 && x > gWave.reverseExtremeX);
+        bool extendsReverseDirection = (gWave.firstDirection > 0 && x < gWave.reverseExtremeX) ||
+                                       (gWave.firstDirection < 0 && x > gWave.reverseExtremeX);
         if (extendsReverseDirection) {
             gWave.reverseExtremeX = x;
-            gWave.reverseTravel = absoluteDifference(
-                    gWave.reverseExtremeX, gWave.firstExtremeX);
+            gWave.reverseTravel = absoluteDifference(gWave.reverseExtremeX, gWave.firstExtremeX);
         }
     }
 
-    if (gWave.state == WAVE_TRACKING_REVERSE
-            && gWave.reverseTravel >= minimumReverseTravel
-            && gWave.candidateFrames >= kConfig.minimumCandidateFrames
-            && durationMs >= kConfig.minimumWaveDurationMs) {
-        LOGI("wave confirmed timestampMs=%lld durationMs=%lld direction=%d first=%d reverse=%d vertical=%d frames=%d",
-                static_cast<long long>(timestampMs), static_cast<long long>(durationMs),
-                gWave.firstDirection, gWave.firstTravel, gWave.reverseTravel,
-                gWave.maximumY - gWave.minimumY, gWave.candidateFrames);
+    if (gWave.state == WAVE_TRACKING_REVERSE && gWave.reverseTravel >= minimumReverseTravel &&
+        gWave.candidateFrames >= kConfig.minimumCandidateFrames &&
+        durationMs >= kConfig.minimumWaveDurationMs) {
+        LOGI("wave confirmed timestampMs=%lld durationMs=%lld direction=%d first=%d reverse=%d "
+             "vertical=%d frames=%d",
+             static_cast<long long>(timestampMs), static_cast<long long>(durationMs),
+             gWave.firstDirection, gWave.firstTravel, gWave.reverseTravel,
+             gWave.maximumY - gWave.minimumY, gWave.candidateFrames);
         gWave.lastConfirmedTimestampMs = timestampMs;
         clearWaveTrajectory();
         return GESTURE_RESULT_WAVE;
@@ -452,28 +413,24 @@ int updateWaveTrajectory(int x, int y, int areaPermille, int motionPermille,
     return GESTURE_RESULT_MOTION;
 }
 
-int updateFlowTrajectory(const LocalFlowEstimate& flow, int64_t timestampMs,
-        int roiWidth, int* flags) {
-    if ((*flags & (GESTURE_FLAG_GLOBAL_MOTION
-            | GESTURE_FLAG_EXPOSURE_CHANGE
-            | GESTURE_FLAG_CAMERA_TRANSLATION)) != 0) {
+int updateFlowTrajectory(const LocalFlowEstimate& flow, int64_t timestampMs, int roiWidth,
+                         int* flags) {
+    if ((*flags & (GESTURE_FLAG_GLOBAL_MOTION | GESTURE_FLAG_EXPOSURE_CHANGE |
+                   GESTURE_FLAG_CAMERA_TRANSLATION)) != 0) {
         clearFlowTrajectory();
         return GESTURE_RESULT_NONE;
     }
 
-    if (gWave.lastConfirmedTimestampMs > 0
-            && timestampMs >= gWave.lastConfirmedTimestampMs
-            && timestampMs - gWave.lastConfirmedTimestampMs
-                    < kConfig.refractoryDurationMs) {
+    if (gWave.lastConfirmedTimestampMs > 0 && timestampMs >= gWave.lastConfirmedTimestampMs &&
+        timestampMs - gWave.lastConfirmedTimestampMs < kConfig.refractoryDurationMs) {
         clearFlowTrajectory();
         return flow.valid ? GESTURE_RESULT_MOTION : GESTURE_RESULT_NONE;
     }
 
-    if (!flow.valid
-            || absoluteDifference(flow.displacementX, 0)
-                    < kConfig.flowMinimumVectorPixels) {
-        if (gFlow.state != FLOW_IDLE
-                && timestampMs - gFlow.lastTimestampMs > kConfig.flowMaximumGapMs) {
+    if (!flow.valid ||
+        absoluteDifference(flow.displacementX, 0) < kConfig.flowMinimumVectorPixels) {
+        if (gFlow.state != FLOW_IDLE &&
+            timestampMs - gFlow.lastTimestampMs > kConfig.flowMaximumGapMs) {
             clearFlowTrajectory();
         }
         return GESTURE_RESULT_NONE;
@@ -485,18 +442,16 @@ int updateFlowTrajectory(const LocalFlowEstimate& flow, int64_t timestampMs,
     }
 
     int64_t durationMs = timestampMs - gFlow.startTimestampMs;
-    if (durationMs < 0 || durationMs > kConfig.flowMaximumDurationMs
-            || timestampMs - gFlow.lastTimestampMs > kConfig.flowMaximumGapMs) {
+    if (durationMs < 0 || durationMs > kConfig.flowMaximumDurationMs ||
+        timestampMs - gFlow.lastTimestampMs > kConfig.flowMaximumGapMs) {
         beginFlowTrajectory(flow.displacementX, timestampMs);
         return GESTURE_RESULT_MOTION;
     }
 
     int direction = flow.displacementX > 0 ? 1 : -1;
     int distance = absoluteDifference(flow.displacementX, 0);
-    int minimumFirstTravel = percentageOf(roiWidth,
-            kConfig.flowMinimumFirstTravelPercent);
-    int minimumReverseTravel = percentageOf(roiWidth,
-            kConfig.flowMinimumReverseTravelPercent);
+    int minimumFirstTravel = percentageOf(roiWidth, kConfig.flowMinimumFirstTravelPercent);
+    int minimumReverseTravel = percentageOf(roiWidth, kConfig.flowMinimumReverseTravelPercent);
     ++gFlow.vectorFrames;
     gFlow.lastTimestampMs = timestampMs;
 
@@ -517,15 +472,15 @@ int updateFlowTrajectory(const LocalFlowEstimate& flow, int64_t timestampMs,
         return GESTURE_RESULT_MOTION;
     }
 
-    if (gFlow.state == FLOW_TRACKING_REVERSE
-            && gFlow.firstTravel >= minimumFirstTravel
-            && gFlow.reverseTravel >= minimumReverseTravel
-            && gFlow.vectorFrames >= kConfig.flowMinimumVectorFrames
-            && durationMs >= kConfig.flowMinimumDurationMs) {
-        LOGI("flow wave confirmed timestampMs=%lld durationMs=%lld direction=%d first=%d reverse=%d vectors=%d support=%d confidence=%d",
-                static_cast<long long>(timestampMs), static_cast<long long>(durationMs),
-                gFlow.firstDirection, gFlow.firstTravel, gFlow.reverseTravel,
-                gFlow.vectorFrames, flow.supportingBlocks, flow.confidencePermille);
+    if (gFlow.state == FLOW_TRACKING_REVERSE && gFlow.firstTravel >= minimumFirstTravel &&
+        gFlow.reverseTravel >= minimumReverseTravel &&
+        gFlow.vectorFrames >= kConfig.flowMinimumVectorFrames &&
+        durationMs >= kConfig.flowMinimumDurationMs) {
+        LOGI("flow wave confirmed timestampMs=%lld durationMs=%lld direction=%d first=%d "
+             "reverse=%d vectors=%d support=%d confidence=%d",
+             static_cast<long long>(timestampMs), static_cast<long long>(durationMs),
+             gFlow.firstDirection, gFlow.firstTravel, gFlow.reverseTravel, gFlow.vectorFrames,
+             flow.supportingBlocks, flow.confidencePermille);
         gWave.lastConfirmedTimestampMs = timestampMs;
         clearWaveTrajectory();
         clearFlowTrajectory();
@@ -534,9 +489,8 @@ int updateFlowTrajectory(const LocalFlowEstimate& flow, int64_t timestampMs,
     return GESTURE_RESULT_MOTION;
 }
 
-int64_t packMetrics(int result, int meanLuminance, int motionPermille,
-        int globalPermille, int centroidX, int centroidY,
-        int areaPermille, int flags) {
+int64_t packMetrics(int result, int meanLuminance, int motionPermille, int globalPermille,
+                    int centroidX, int centroidY, int areaPermille, int flags) {
     uint64_t packed = 0;
     int resultAndExtendedFlags = result & 0x3;
     if ((flags & GESTURE_FLAG_CAMERA_TRANSLATION) != 0) {
@@ -556,14 +510,14 @@ int64_t packMetrics(int result, int meanLuminance, int motionPermille,
     return static_cast<int64_t>(packed);
 }
 
-bool outsideExpandedRoi(int x, int y, int roiLeft, int roiRight,
-        int roiTop, int roiBottom, int marginX, int marginY) {
-    return x < roiLeft - marginX || x >= roiRight + marginX
-            || y < roiTop - marginY || y >= roiBottom + marginY;
+bool outsideExpandedRoi(int x, int y, int roiLeft, int roiRight, int roiTop, int roiBottom,
+                        int marginX, int marginY) {
+    return x < roiLeft - marginX || x >= roiRight + marginX || y < roiTop - marginY ||
+           y >= roiBottom + marginY;
 }
 
-TranslationEstimate estimateCameraTranslation(int roiLeft, int roiRight,
-        int roiTop, int roiBottom) {
+TranslationEstimate estimateCameraTranslation(int roiLeft, int roiRight, int roiTop,
+                                              int roiBottom) {
     TranslationEstimate estimate = {false, 0, 0, 0, 0, 0};
     int width = gState.outputWidth;
     int height = gState.outputHeight;
@@ -575,8 +529,7 @@ TranslationEstimate estimateCameraTranslation(int roiLeft, int roiRight,
 
     for (int y = searchY; y < height - searchY; y += sampleStep) {
         for (int x = searchX; x < width - searchX; x += sampleStep) {
-            if (!outsideExpandedRoi(x, y, roiLeft, roiRight,
-                    roiTop, roiBottom, searchX, searchY)) {
+            if (!outsideExpandedRoi(x, y, roiLeft, roiRight, roiTop, roiBottom, searchX, searchY)) {
                 continue;
             }
             int index = y * width + x;
@@ -588,8 +541,7 @@ TranslationEstimate estimateCameraTranslation(int roiLeft, int roiRight,
         return estimate;
     }
     estimate.zeroAverageDifference = static_cast<int>(zeroSum / zeroSamples);
-    if (estimate.zeroAverageDifference
-            < kConfig.translationMinimumAverageDifference) {
+    if (estimate.zeroAverageDifference < kConfig.translationMinimumAverageDifference) {
         return estimate;
     }
 
@@ -607,14 +559,14 @@ TranslationEstimate estimateCameraTranslation(int roiLeft, int roiRight,
                 for (int x = searchX; x < width - searchX; x += sampleStep) {
                     int previousX = x + shiftX;
                     int previousY = y + shiftY;
-                    if (!outsideExpandedRoi(x, y, roiLeft, roiRight,
-                            roiTop, roiBottom, searchX, searchY)) {
+                    if (!outsideExpandedRoi(x, y, roiLeft, roiRight, roiTop, roiBottom, searchX,
+                                            searchY)) {
                         continue;
                     }
                     int currentIndex = y * width + x;
                     int previousIndex = previousY * width + previousX;
-                    differenceSum += absoluteDifference(
-                            gState.grayscale[currentIndex], gState.previous[previousIndex]);
+                    differenceSum += absoluteDifference(gState.grayscale[currentIndex],
+                                                        gState.previous[previousIndex]);
                     ++samples;
                 }
             }
@@ -633,32 +585,30 @@ TranslationEstimate estimateCameraTranslation(int roiLeft, int roiRight,
     estimate.shiftX = bestShiftX;
     estimate.shiftY = bestShiftY;
     if (bestShiftX != 0 || bestShiftY != 0) {
-        estimate.improvementPermille = (estimate.zeroAverageDifference - bestAverage)
-                * 1000 / estimate.zeroAverageDifference;
-        estimate.detected = estimate.improvementPermille
-                >= kConfig.translationMinimumImprovementPermille;
+        estimate.improvementPermille =
+            (estimate.zeroAverageDifference - bestAverage) * 1000 / estimate.zeroAverageDifference;
+        estimate.detected =
+            estimate.improvementPermille >= kConfig.translationMinimumImprovementPermille;
     }
     return estimate;
 }
 
-int blockAbsoluteDifference(int currentX, int currentY,
-        int previousX, int previousY, int blockSize) {
+int blockAbsoluteDifference(int currentX, int currentY, int previousX, int previousY,
+                            int blockSize) {
     int difference = 0;
     int width = gState.outputWidth;
     for (int y = 0; y < blockSize; ++y) {
         int currentIndex = (currentY + y) * width + currentX;
         int previousIndex = (previousY + y) * width + previousX;
         for (int x = 0; x < blockSize; ++x) {
-            difference += absoluteDifference(
-                    gState.grayscale[currentIndex + x],
-                    gState.previous[previousIndex + x]);
+            difference += absoluteDifference(gState.grayscale[currentIndex + x],
+                                             gState.previous[previousIndex + x]);
         }
     }
     return difference;
 }
 
-LocalFlowEstimate estimateLocalFlow(int roiLeft, int roiRight,
-        int roiTop, int roiBottom) {
+LocalFlowEstimate estimateLocalFlow(int roiLeft, int roiRight, int roiTop, int roiBottom) {
     const int kMaximumSearchX = 24;
     LocalFlowEstimate estimate = {false, 0, 0, 0, 0};
     if (kConfig.flowSearchX > kMaximumSearchX) {
@@ -678,9 +628,9 @@ LocalFlowEstimate estimateLocalFlow(int roiLeft, int roiRight,
     int totalWeight = 0;
     int totalSupport = 0;
     for (int currentY = roiTop; currentY + blockSize <= roiBottom;
-            currentY += kConfig.flowBlockStep) {
+         currentY += kConfig.flowBlockStep) {
         for (int currentX = roiLeft; currentX + blockSize <= roiRight;
-                currentX += kConfig.flowBlockStep) {
+             currentX += kConfig.flowBlockStep) {
             int maskPixels = 0;
             for (int y = 0; y < blockSize; ++y) {
                 int index = (currentY + y) * width + currentX;
@@ -692,8 +642,8 @@ LocalFlowEstimate estimateLocalFlow(int roiLeft, int roiRight,
                 continue;
             }
 
-            int zeroDifference = blockAbsoluteDifference(currentX, currentY,
-                    currentX, currentY, blockSize);
+            int zeroDifference =
+                blockAbsoluteDifference(currentX, currentY, currentX, currentY, blockSize);
             if (zeroDifference / blockPixels < kConfig.flowMinimumZeroAverage) {
                 continue;
             }
@@ -706,18 +656,16 @@ LocalFlowEstimate estimateLocalFlow(int roiLeft, int roiRight,
                 if (previousY < roiTop || previousY + blockSize > roiBottom) {
                     continue;
                 }
-                for (int dx = -kConfig.flowSearchX;
-                        dx <= kConfig.flowSearchX; ++dx) {
-                    if (absoluteDifference(dx, 0)
-                            < kConfig.flowMinimumVectorPixels) {
+                for (int dx = -kConfig.flowSearchX; dx <= kConfig.flowSearchX; ++dx) {
+                    if (absoluteDifference(dx, 0) < kConfig.flowMinimumVectorPixels) {
                         continue;
                     }
                     int previousX = currentX - dx;
                     if (previousX < roiLeft || previousX + blockSize > roiRight) {
                         continue;
                     }
-                    int difference = blockAbsoluteDifference(currentX, currentY,
-                            previousX, previousY, blockSize);
+                    int difference = blockAbsoluteDifference(currentX, currentY, previousX,
+                                                             previousY, blockSize);
                     if (difference < bestDifference) {
                         bestDifference = difference;
                         bestDx = dx;
@@ -726,12 +674,10 @@ LocalFlowEstimate estimateLocalFlow(int roiLeft, int roiRight,
                 }
             }
 
-            if (bestDx == 0
-                    || bestDifference / blockPixels > kConfig.flowMaximumBestAverage) {
+            if (bestDx == 0 || bestDifference / blockPixels > kConfig.flowMaximumBestAverage) {
                 continue;
             }
-            int improvementPermille = (zeroDifference - bestDifference)
-                    * 1000 / zeroDifference;
+            int improvementPermille = (zeroDifference - bestDifference) * 1000 / zeroDifference;
             if (improvementPermille < kConfig.flowMinimumImprovementPermille) {
                 continue;
             }
@@ -745,9 +691,8 @@ LocalFlowEstimate estimateLocalFlow(int roiLeft, int roiRight,
     }
 
     estimate.supportingBlocks = totalSupport;
-    if (totalSupport < kConfig.flowMinimumSupportingBlocks
-            || totalSupport > kConfig.flowMaximumSupportingBlocks
-            || totalWeight <= 0) {
+    if (totalSupport < kConfig.flowMinimumSupportingBlocks ||
+        totalSupport > kConfig.flowMaximumSupportingBlocks || totalWeight <= 0) {
         return estimate;
     }
 
@@ -774,13 +719,10 @@ LocalFlowEstimate estimateLocalFlow(int roiLeft, int roiRight,
         }
     }
 
-    int winningWeight = positiveWeight >= negativeWeight
-            ? positiveWeight : negativeWeight;
-    estimate.confidencePermille = winningWeight <= 0
-            ? 0 : winningWeight * 1000 / totalWeight;
-    if (winningWeight <= 0
-            || estimate.confidencePermille
-                    < kConfig.flowMinimumSignConsensusPermille) {
+    int winningWeight = positiveWeight >= negativeWeight ? positiveWeight : negativeWeight;
+    estimate.confidencePermille = winningWeight <= 0 ? 0 : winningWeight * 1000 / totalWeight;
+    if (winningWeight <= 0 ||
+        estimate.confidencePermille < kConfig.flowMinimumSignConsensusPermille) {
         return estimate;
     }
     if (positiveWeight >= negativeWeight) {
@@ -792,9 +734,9 @@ LocalFlowEstimate estimateLocalFlow(int roiLeft, int roiRight,
         estimate.displacementY = negativeVertical / negativeWeight;
         estimate.supportingBlocks = negativeSupport;
     }
-    estimate.valid = estimate.supportingBlocks >= kConfig.flowMinimumSupportingBlocks
-            && absoluteDifference(estimate.displacementX, 0)
-                    >= kConfig.flowMinimumVectorPixels;
+    estimate.valid =
+        estimate.supportingBlocks >= kConfig.flowMinimumSupportingBlocks &&
+        absoluteDifference(estimate.displacementX, 0) >= kConfig.flowMinimumVectorPixels;
     return estimate;
 }
 
@@ -805,17 +747,15 @@ int decodeToGrayscale(const uint8_t* jpegData, size_t jpegLength) {
     input.offset = 0;
 
     pjpeg_image_info_t imageInfo;
-    unsigned char status = pjpeg_decode_init(&imageInfo, readJpegBytes, &input,
-            kLumaOnlyReducedJpegDecode);
+    unsigned char status =
+        pjpeg_decode_init(&imageInfo, readJpegBytes, &input, kLumaOnlyReducedJpegDecode);
     if (status != 0) {
         LOGE("pjpeg_decode_init failed status=%u", static_cast<unsigned int>(status));
         return GESTURE_ERROR_JPEG_DECODE;
     }
-    if (imageInfo.m_width != gState.sourceWidth
-            || imageInfo.m_height != gState.sourceHeight) {
-        LOGE("unexpected JPEG dimensions actual=%dx%d expected=%dx%d",
-                imageInfo.m_width, imageInfo.m_height,
-                gState.sourceWidth, gState.sourceHeight);
+    if (imageInfo.m_width != gState.sourceWidth || imageInfo.m_height != gState.sourceHeight) {
+        LOGE("unexpected JPEG dimensions actual=%dx%d expected=%dx%d", imageInfo.m_width,
+             imageInfo.m_height, gState.sourceWidth, gState.sourceHeight);
         return GESTURE_ERROR_JPEG_DIMENSIONS;
     }
 
@@ -828,7 +768,7 @@ int decodeToGrayscale(const uint8_t* jpegData, size_t jpegLength) {
             status = pjpeg_decode_mcu();
             if (status != 0) {
                 LOGE("pjpeg_decode_mcu failed status=%u mcu=%d,%d",
-                        static_cast<unsigned int>(status), mcuXIndex, mcuYIndex);
+                     static_cast<unsigned int>(status), mcuXIndex, mcuYIndex);
                 return GESTURE_ERROR_JPEG_DECODE;
             }
 
@@ -856,8 +796,8 @@ int decodeToGrayscale(const uint8_t* jpegData, size_t jpegLength) {
                     int localX = sourceX - sourceLeft;
                     int offset = mcuBufferOffset(localX, localY);
                     int luminance = imageInfo.m_pMCUBufR[offset];
-                    gState.grayscale[outputY * gState.outputWidth + outputX]
-                            = static_cast<uint8_t>(luminance);
+                    gState.grayscale[outputY * gState.outputWidth + outputX] =
+                        static_cast<uint8_t>(luminance);
                     luminanceSum += static_cast<uint64_t>(luminance);
                     ++writtenPixels;
                 }
@@ -867,12 +807,13 @@ int decodeToGrayscale(const uint8_t* jpegData, size_t jpegLength) {
 
     int expectedPixels = gState.outputWidth * gState.outputHeight;
     if (writtenPixels != expectedPixels) {
-        LOGE("grayscale coverage mismatch actual=%d expected=%d",
-                writtenPixels, expectedPixels);
+        LOGE("grayscale coverage mismatch actual=%d expected=%d", writtenPixels, expectedPixels);
         return GESTURE_ERROR_JPEG_DECODE;
     }
-    gState.currentMeanLuminance = expectedPixels == 0
-            ? 0 : static_cast<int>(luminanceSum / static_cast<uint64_t>(expectedPixels));
+    gState.currentMeanLuminance =
+        expectedPixels == 0
+            ? 0
+            : static_cast<int>(luminanceSum / static_cast<uint64_t>(expectedPixels));
     return 0;
 }
 
@@ -881,8 +822,7 @@ int64_t analyzeMotion(int64_t timestampMs) {
         memcpy(gState.previous, gState.grayscale, gState.pixelCount);
         gState.previousMeanLuminance = gState.currentMeanLuminance;
         gState.hasPrevious = true;
-        return packMetrics(GESTURE_RESULT_NONE, gState.currentMeanLuminance,
-                0, 0, 255, 255, 0, 0);
+        return packMetrics(GESTURE_RESULT_NONE, gState.currentMeanLuminance, 0, 0, 255, 255, 0, 0);
     }
 
     int width = gState.outputWidth;
@@ -897,12 +837,12 @@ int64_t analyzeMotion(int64_t timestampMs) {
 
     uint64_t differenceSum = 0;
     for (size_t i = 0; i < gState.pixelCount; ++i) {
-        differenceSum += static_cast<uint64_t>(absoluteDifference(
-                gState.grayscale[i], gState.previous[i]));
+        differenceSum +=
+            static_cast<uint64_t>(absoluteDifference(gState.grayscale[i], gState.previous[i]));
     }
     int averageDifference = static_cast<int>(differenceSum / gState.pixelCount);
-    int differenceThreshold = kConfig.minimumDifference
-            + averageDifference * kConfig.adaptiveDifferenceMultiplier;
+    int differenceThreshold =
+        kConfig.minimumDifference + averageDifference * kConfig.adaptiveDifferenceMultiplier;
     if (differenceThreshold > kConfig.maximumDifferenceThreshold) {
         differenceThreshold = kConfig.maximumDifferenceThreshold;
     }
@@ -927,18 +867,17 @@ int64_t analyzeMotion(int64_t timestampMs) {
     int globalPermille = clampPermille(globalChanged, static_cast<int>(gState.pixelCount));
     int motionPermille = clampPermille(roiChanged, roiPixels);
     int flags = 0;
-    if (globalPermille >= kConfig.globalMotionPermille
-            || motionPermille >= kConfig.roiMotionPermille) {
+    if (globalPermille >= kConfig.globalMotionPermille ||
+        motionPermille >= kConfig.roiMotionPermille) {
         flags |= GESTURE_FLAG_GLOBAL_MOTION;
     }
-    if (absoluteDifference(gState.currentMeanLuminance,
-            gState.previousMeanLuminance) >= kConfig.exposureJump) {
+    if (absoluteDifference(gState.currentMeanLuminance, gState.previousMeanLuminance) >=
+        kConfig.exposureJump) {
         flags |= GESTURE_FLAG_EXPOSURE_CHANGE;
     }
     TranslationEstimate translation = {false, 0, 0, 0, 0, 0};
     if (flags == 0) {
-        translation = estimateCameraTranslation(
-                roiLeft, roiRight, roiTop, roiBottom);
+        translation = estimateCameraTranslation(roiLeft, roiRight, roiTop, roiBottom);
         if (translation.detected) {
             flags |= GESTURE_FLAG_CAMERA_TRANSLATION;
         }
@@ -1005,47 +944,42 @@ int64_t analyzeMotion(int64_t timestampMs) {
                     ++area;
                     sumX += pointX;
                     sumY += pointY;
-                    if (pointX < minX) minX = pointX;
-                    if (pointX > maxX) maxX = pointX;
-                    if (pointY < minY) minY = pointY;
-                    if (pointY > maxY) maxY = pointY;
+                    if (pointX < minX)
+                        minX = pointX;
+                    if (pointX > maxX)
+                        maxX = pointX;
+                    if (pointY < minY)
+                        minY = pointY;
+                    if (pointY > maxY)
+                        maxY = pointY;
 
-                    const int neighbourIndexes[4] = {
-                        index - 1, index + 1, index - width, index + width
-                    };
+                    const int neighbourIndexes[4] = {index - 1, index + 1, index - width,
+                                                     index + width};
                     for (int neighbour = 0; neighbour < 4; ++neighbour) {
                         int neighbourIndex = neighbourIndexes[neighbour];
                         int neighbourY = neighbourIndex / width;
                         int neighbourX = neighbourIndex - neighbourY * width;
-                        if (neighbourX >= roiLeft && neighbourX < roiRight
-                                && neighbourY >= roiTop && neighbourY < roiBottom
-                                && gState.grayscale[neighbourIndex] == 1) {
+                        if (neighbourX >= roiLeft && neighbourX < roiRight &&
+                            neighbourY >= roiTop && neighbourY < roiBottom &&
+                            gState.grayscale[neighbourIndex] == 1) {
                             gState.grayscale[neighbourIndex] = 2;
-                            gState.componentQueue[queueTail++]
-                                    = static_cast<uint16_t>(neighbourIndex);
+                            gState.componentQueue[queueTail++] =
+                                static_cast<uint16_t>(neighbourIndex);
                         }
                     }
                 }
 
                 int candidateAreaPermille = clampPermille(area, roiPixels);
-                int candidateWidthPermille = clampPermille(
-                        maxX - minX + 1, roiWidth);
-                int candidateHeightPermille = clampPermille(
-                        maxY - minY + 1, roiHeight);
-                bool plausible = area >= kConfig.minimumComponentArea
-                        && candidateAreaPermille
-                                <= kConfig.maximumComponentAreaPermille
-                        && candidateWidthPermille
-                                <= kConfig.maximumComponentWidthPermille
-                        && candidateHeightPermille
-                                <= kConfig.maximumComponentHeightPermille;
-                if (!plausible && area >= kConfig.minimumComponentArea
-                        && (candidateAreaPermille
-                                    > kConfig.maximumComponentAreaPermille
-                                || candidateWidthPermille
-                                    > kConfig.maximumComponentWidthPermille
-                                || candidateHeightPermille
-                                    > kConfig.maximumComponentHeightPermille)) {
+                int candidateWidthPermille = clampPermille(maxX - minX + 1, roiWidth);
+                int candidateHeightPermille = clampPermille(maxY - minY + 1, roiHeight);
+                bool plausible = area >= kConfig.minimumComponentArea &&
+                                 candidateAreaPermille <= kConfig.maximumComponentAreaPermille &&
+                                 candidateWidthPermille <= kConfig.maximumComponentWidthPermille &&
+                                 candidateHeightPermille <= kConfig.maximumComponentHeightPermille;
+                if (!plausible && area >= kConfig.minimumComponentArea &&
+                    (candidateAreaPermille > kConfig.maximumComponentAreaPermille ||
+                     candidateWidthPermille > kConfig.maximumComponentWidthPermille ||
+                     candidateHeightPermille > kConfig.maximumComponentHeightPermille)) {
                     rejectedOversizedComponent = true;
                 }
                 if (plausible && area > bestArea) {
@@ -1071,21 +1005,17 @@ int64_t analyzeMotion(int64_t timestampMs) {
         flags |= GESTURE_FLAG_NO_PLAUSIBLE_COMPONENT;
     }
 
-    result = updateWaveTrajectory(
-            centroidX == 255 ? -1 : centroidX,
-            centroidY == 255 ? -1 : centroidY,
-            areaPermille, motionPermille, timestampMs,
-            roiWidth, roiHeight, &flags);
+    result = updateWaveTrajectory(centroidX == 255 ? -1 : centroidX,
+                                  centroidY == 255 ? -1 : centroidY, areaPermille, motionPermille,
+                                  timestampMs, roiWidth, roiHeight, &flags);
 
     if (result == GESTURE_RESULT_WAVE) {
         clearFlowTrajectory();
     } else {
-        int flowResult = updateFlowTrajectory(
-                flow, timestampMs, roiWidth, &flags);
+        int flowResult = updateFlowTrajectory(flow, timestampMs, roiWidth, &flags);
         if (flowResult == GESTURE_RESULT_WAVE) {
             result = GESTURE_RESULT_WAVE;
-        } else if (result == GESTURE_RESULT_NONE
-                && flowResult == GESTURE_RESULT_MOTION) {
+        } else if (result == GESTURE_RESULT_NONE && flowResult == GESTURE_RESULT_MOTION) {
             result = GESTURE_RESULT_MOTION;
         }
     }
@@ -1099,9 +1029,8 @@ int64_t analyzeMotion(int64_t timestampMs) {
         centroidY = flow.supportingBlocks;
     }
 
-    return packMetrics(result, gState.currentMeanLuminance,
-            motionPermille, globalPermille, centroidX, centroidY,
-            areaPermille, flags);
+    return packMetrics(result, gState.currentMeanLuminance, motionPermille, globalPermille,
+                       centroidX, centroidY, areaPermille, flags);
 }
 
 void resetLocked() {
@@ -1145,33 +1074,28 @@ void destroyLocked() {
     gWave.lastConfirmedTimestampMs = 0;
 }
 
-}  // namespace
+} // namespace
 
-extern "C" JNIEXPORT jboolean JNICALL
-Java_io_pihda_wavesnap_NativeGestureDetector_nativeInitialize(
-        JNIEnv*, jclass, jint sourceWidth, jint sourceHeight,
-        jint outputWidth, jint outputHeight) {
+extern "C" JNIEXPORT jboolean JNICALL Java_io_pihda_wavesnap_NativeGestureDetector_nativeInitialize(
+    JNIEnv*, jclass, jint sourceWidth, jint sourceHeight, jint outputWidth, jint outputHeight) {
     pthread_mutex_lock(&gDetectorMutex);
     destroyLocked();
 
-    if (sourceWidth <= 0 || sourceHeight <= 0
-            || outputWidth <= 0 || outputHeight <= 0
-            || sourceWidth > kMaximumDimension || sourceHeight > kMaximumDimension
-            || outputWidth > sourceWidth || outputHeight > sourceHeight) {
+    if (sourceWidth <= 0 || sourceHeight <= 0 || outputWidth <= 0 || outputHeight <= 0 ||
+        sourceWidth > kMaximumDimension || sourceHeight > kMaximumDimension ||
+        outputWidth > sourceWidth || outputHeight > sourceHeight) {
         pthread_mutex_unlock(&gDetectorMutex);
         return JNI_FALSE;
     }
 
-    size_t pixelCount = static_cast<size_t>(outputWidth)
-            * static_cast<size_t>(outputHeight);
+    size_t pixelCount = static_cast<size_t>(outputWidth) * static_cast<size_t>(outputHeight);
     if (pixelCount > kMaximumQueuePixels) {
         pthread_mutex_unlock(&gDetectorMutex);
         return JNI_FALSE;
     }
     size_t workspaceBytes = pixelCount * 3;
     gState.workspace = static_cast<uint8_t*>(malloc(workspaceBytes));
-    gState.componentQueue = static_cast<uint16_t*>(
-            malloc(pixelCount * sizeof(uint16_t)));
+    gState.componentQueue = static_cast<uint16_t*>(malloc(pixelCount * sizeof(uint16_t)));
     if (gState.workspace == NULL || gState.componentQueue == NULL) {
         destroyLocked();
         pthread_mutex_unlock(&gDetectorMutex);
@@ -1191,16 +1115,14 @@ Java_io_pihda_wavesnap_NativeGestureDetector_nativeInitialize(
     resetLocked();
 
     size_t totalBytes = workspaceBytes + pixelCount * sizeof(uint16_t);
-    LOGI("initialized source=%dx%d output=%dx%d nativeBytes=%u",
-            sourceWidth, sourceHeight, outputWidth, outputHeight,
-            static_cast<unsigned int>(totalBytes));
+    LOGI("initialized source=%dx%d output=%dx%d nativeBytes=%u", sourceWidth, sourceHeight,
+         outputWidth, outputHeight, static_cast<unsigned int>(totalBytes));
     pthread_mutex_unlock(&gDetectorMutex);
     return JNI_TRUE;
 }
 
-extern "C" JNIEXPORT jlong JNICALL
-Java_io_pihda_wavesnap_NativeGestureDetector_nativeProcess(
-        JNIEnv* env, jclass, jobject jpegBuffer, jint jpegLength, jlong timestampMs) {
+extern "C" JNIEXPORT jlong JNICALL Java_io_pihda_wavesnap_NativeGestureDetector_nativeProcess(
+    JNIEnv* env, jclass, jobject jpegBuffer, jint jpegLength, jlong timestampMs) {
     if (jpegBuffer == NULL || jpegLength <= 0) {
         return GESTURE_ERROR_INVALID_ARGUMENT;
     }
@@ -1215,8 +1137,8 @@ Java_io_pihda_wavesnap_NativeGestureDetector_nativeProcess(
         pthread_mutex_unlock(&gDetectorMutex);
         return GESTURE_ERROR_NOT_INITIALIZED;
     }
-    int decodeResult = decodeToGrayscale(static_cast<const uint8_t*>(address),
-            static_cast<size_t>(jpegLength));
+    int decodeResult =
+        decodeToGrayscale(static_cast<const uint8_t*>(address), static_cast<size_t>(jpegLength));
     if (decodeResult < 0) {
         pthread_mutex_unlock(&gDetectorMutex);
         return decodeResult;
@@ -1226,17 +1148,15 @@ Java_io_pihda_wavesnap_NativeGestureDetector_nativeProcess(
     return static_cast<jlong>(result);
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_io_pihda_wavesnap_NativeGestureDetector_nativeReset(
-        JNIEnv*, jclass) {
+extern "C" JNIEXPORT void JNICALL Java_io_pihda_wavesnap_NativeGestureDetector_nativeReset(JNIEnv*,
+                                                                                           jclass) {
     pthread_mutex_lock(&gDetectorMutex);
     resetLocked();
     pthread_mutex_unlock(&gDetectorMutex);
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_io_pihda_wavesnap_NativeGestureDetector_nativeDestroy(
-        JNIEnv*, jclass) {
+Java_io_pihda_wavesnap_NativeGestureDetector_nativeDestroy(JNIEnv*, jclass) {
     pthread_mutex_lock(&gDetectorMutex);
     destroyLocked();
     pthread_mutex_unlock(&gDetectorMutex);

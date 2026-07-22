@@ -20,6 +20,7 @@ The project intentionally targets the Sony camera's legacy Android 2.3 runtime: 
 Use the checked-in workflow scripts:
 
 ```sh
+./scripts/format.sh --check
 ./scripts/smoke-test.sh
 ./scripts/install.sh
 ```
